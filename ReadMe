@@ -6,8 +6,9 @@ Here is the folder descriptions:
 
 - figures: Will contain all the figures for paper 1. Callum is also welcome to use it to contain figures for paper 2
 
-- idefix: Hossam's copy of the code. Very similar to the publicaly available version apart from the dust solver (Hossam implemented Athena++ solver) and some safeguards against crashing when strong dust instabilities are encountered (there's also a couple of additional test setups, including settling instability). Results should be identical if you use the public version instead. However, if you use the public version you need to change the 'hll_dustathena' parameter for the dust solver in any idefix.ini file to 'hll_dust', since the public version does not have the athena++ dust solver.
-
 - scripts: Any script notebooks used for analysis, plotting, and setting up simulations. So far figures.ipynb will contain the exact scripts to produce all figures for paper 1 (Callum can also use it for paper 2 figures, or have those in a separate notebook, or not at all). free_sloshing.ipynb contains scripts to analyse and setup the free sloshing simulations used for paper 2. Anything starting with 'sandbox' is not meant to make sense to anyone but Hossam
 
 - setups: Contains all the idefix setup files for all idefix simulations used for both papers. Hopefully the subdirectories make sense. 
+
+
+Note: when using the public version of idefix, make sure the solver in the Dust section in any idefix.ini file is set to 'hll_dust' instead of 'hll_dustathena', which does not exist in the public version. I tried to clean all the idefix.ini files in the free_sloshing directory from this but I may have skipped some
