@@ -318,9 +318,11 @@ void Analysis(DataBlock & data) {
   // Sync it
   d.SyncFromDevice();
   real rho = d.dustVc[0](RHO,0,0,0);
+  real KE = 0.0;
   for(int k = 0; k < d.np_tot[KDIR] ; k++) {
     for(int j = 0; j < d.np_tot[JDIR] ; j++) {
       for(int i = 0; i < d.np_tot[IDIR] ; i++) {
+        KE = KE + d.Vc(RHO,k,j,i)*d.Vc(VX3,k,j,i)*d.Vc(VX3,k,j,i);
         if(rho < d.dustVc[0](RHO,k,j,i)) {
           rho=d.dustVc[0](RHO,k,j,i);
         }
@@ -329,16 +331,18 @@ void Analysis(DataBlock & data) {
   }
   #ifdef WITH_MPI
   real rho_max;
+  real KE_total;
   MPI_Reduce(&rho, &rho_max, 1, realMPI, MPI_MAX, 0, MPI_COMM_WORLD);
+  MPI_Reduce(&KE, KE_total, 1 realMPI, MPI_SUM, 0, MPI_COMM_WORLD);
   #endif
   if(idfx::prank == 0) {
   std::ofstream f;
   f.open(FILENAME,std::ios::app);
   f.precision(10);
   #ifdef WITH_MPI
-  f << std::scientific << data.t << "	" << rho_max << "	" << std::endl;
+  f << std::scientific << data.t << "	" << rho_max << "	" << 0.5/d.np_tot[KDIR]*1.2084/d.np_tot[IDIR]*3.14159/d.np_tot[JDIR]*KE_total << " " << std::endl;
   #else
-  f << std::scientific << data.t << "	" << rho << "	" << std::endl;
+  f << std::scientific << data.t << "	" << rho << "	" << 0.5/d.np_tot[KDIR]*1.2084/d.np_tot[IDIR]*3.14159/d.np_tot[JDIR]*KE << " " << std::endl;
   #endif
   f.close();
   }
@@ -415,12 +419,20 @@ void Setup::InitFlow(DataBlock &data) {
                 d.Vc(VX3,k,j,i) += -norm_n2*Kx*Kb*2*w_n2*sin(Kx*x+Kb*2*z);
 
                 d.dustVc[0](RHO,k,j,i) = chi;
+                d.dustVc[0](RHO,k,j,i) *= exp(-0.00333232*cos(Kx*x+Kb*1*z)-0.00002455*sin(Kx*x+Kb*1*z));
+                d.dustVc[0](RHO,k,j,i) *= exp(0.00395556*cos(Kx*x+Kb*2*z)-0.00050466*sin(Kx*x+Kb*2*z));
 
                 d.dustVc[0](VX1,k,j,i) = psi*cs*sin(Kb*z);
+                d.dustVc[0](VX1,k,j,i) += 0.00010000*cos(Kx*x+Kb*1*z);
+                d.dustVc[0](VX1,k,j,i) += 0.00010000*cos(Kx*x+Kb*2*z);
 
                 d.dustVc[0](VX2,k,j,i) = shear*x;
+                d.dustVc[0](VX2,k,j,i) += 0.00002996*cos(Kx*x+Kb*1*z)-0.00004255*sin(Kx*x+Kb*1*z);
+                d.dustVc[0](VX2,k,j,i) += 0.00001300*cos(Kx*x+Kb*2*z)+0.00005086*sin(Kx*x+Kb*2*z);
 
                 d.dustVc[0](VX3,k,j,i) = 0.0;
+                d.dustVc[0](VX3,k,j,i) += -0.00004992*cos(Kx*x+Kb*1*z)+0.00002028*sin(Kx*x+Kb*1*z);
+                d.dustVc[0](VX3,k,j,i) += 0.00008901*cos(Kx*x+Kb*2*z)+0.00002073*sin(Kx*x+Kb*2*z);
 
             }
         }

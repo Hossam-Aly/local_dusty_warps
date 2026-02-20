@@ -6,6 +6,8 @@ static real shear;
 static real psi;
 static real cs;
 real epsilon;
+real chi;
+real tauGlob;
 real pi=3.14;
 
 
@@ -98,6 +100,7 @@ void nonReflective(DataBlock& data, int dir, BoundarySide side, real t) {
   IdefixArray1D<real> z = data.x[KDIR];
 
   real shearLocal = shear;
+  real chilocal = chi;
 
 
   int nxi = data.np_int[IDIR];
@@ -139,10 +142,36 @@ void nonReflective(DataBlock& data, int dir, BoundarySide side, real t) {
           Vc(VX2,k,j,i) = -2.1162*z(k)*sin(t)+shearLocal*x(i);
         }
         });
+  data.dust[0]->boundary->BoundaryFor("nonReflective", dir, side,
+    KOKKOS_LAMBDA (int k, int j, int i) {
+      int iref, jref, kref;
+        // This hack takes care of cases where we have more ghost zones than active zones
+        //real x=d.x[IDIR](i);
+        if(dir==IDIR)
+          iref = ighost + (i+ighost*(nxi-1))%nxi;
+        else
+          iref = i;
+        if(dir==JDIR)
+          jref = jghost + (j+jghost*(nxj-1))%nxj;
+        else
+          jref = j;
+        if(dir==KDIR)
+          kref = kghost + (k+kghost*(nxk-1))%nxk;
+        else
+          kref = k;
+        Uc(RHO,k,j,i) = Uc(RHO,kref,jref,iref);
+        Uc(VX3,k,j,i) = Uc(VX3,kref,jref,iref);
+        if(kref == k){
+          Uc(VX1,k,j,i) = Uc(VX1,kref,jref,iref);
+          Uc(VX2,k,j,i) = Uc(VX2,kref,jref,iref);
+        }
+        else{
+          Uc(VX1,k,j,i) = 4.160947*z(k)*cos(t);
+          Uc(VX2,k,j,i) = -2.1067767*z(k)*sin(t)+shearLocal*x(i);
+        }
 
 
-
-        
+        });
 }
 
 void ApplyBoundaryReversePeriodic(DataBlock *data, IdefixArray4D<real> Vc, int dir, BoundarySide side) {
@@ -192,25 +221,110 @@ void reversePeriodicGas(Hydro *hydro, int dir, BoundarySide side, real t) {
   ApplyBoundaryReversePeriodic(hydro->data, hydro->Vc, dir, side);
 }
 
+void reversePeriodicDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, real t) {
+  ApplyBoundaryReversePeriodic(dust->data, dust->Vc, dir, side);
+}
 
 
+void reversePeriodic(DataBlock& data, int dir, BoundarySide side, real t) {
+  idfx::pushRegion("reversePeriodic");
+  IdefixArray4D<real> Vc = data.hydro->Vc;
+  IdefixArray4D<real> Uc = data.dust[0]->Vc;
+
+  IdefixArray1D<real> x = data.x[IDIR];
+  real shearLocal = shear;
+
+
+  int nxi = data.np_int[IDIR];
+  int nxj = data.np_int[JDIR];
+  int nxk = data.np_int[KDIR];
+
+  const int ighost = data.nghost[IDIR];
+  const int jghost = data.nghost[JDIR];
+  const int kghost = data.nghost[KDIR];
+  //DataBlockHost d(data);
+
+  data.hydro->boundary->BoundaryFor("reversePeriodic", dir, side,
+    KOKKOS_LAMBDA (int k, int j, int i) {
+      int iref, jref, kref;
+        // This hack takes care of cases where we have more ghost zones than active zones
+        //real x=d.x[IDIR](i);
+        if(dir==IDIR)
+          iref = ighost + (i+ighost*(nxi-1))%nxi;
+        else
+          iref = i;
+        if(dir==JDIR)
+          jref = jghost + (j+jghost*(nxj-1))%nxj;
+        else
+          jref = j;
+        if(dir==KDIR)
+          kref = kghost + (k+kghost*(nxk-1))%nxk;
+        else
+          kref = k;
+        
+        Vc(RHO,k,j,i) = Vc(RHO,kref,jref,iref);
+        Vc(VX3,k,j,i) = Vc(VX3,kref,jref,iref);
+        if(kref == k){
+          Vc(VX1,k,j,i) = Vc(VX1,kref,jref,iref);
+          Vc(VX2,k,j,i) = Vc(VX2,kref,jref,iref);
+
+        }
+        else{
+          Vc(VX1,k,j,i) = -Vc(VX1,kref,jref,iref);
+          Vc(VX2,k,j,i) = -Vc(VX2,kref,jref,iref)+2.*shearLocal*x(i);
+        }
+        });
+  data.dust[0]->boundary->BoundaryFor("reversePeriodic", dir, side,
+    KOKKOS_LAMBDA (int k, int j, int i) {
+      int iref, jref, kref;
+        // This hack takes care of cases where we have more ghost zones than active zones
+        //real x=d.x[IDIR](i);
+        if(dir==IDIR)
+          iref = ighost + (i+ighost*(nxi-1))%nxi;
+        else
+          iref = i;
+        if(dir==JDIR)
+          jref = jghost + (j+jghost*(nxj-1))%nxj;
+        else
+          jref = j;
+        if(dir==KDIR)
+          kref = kghost + (k+kghost*(nxk-1))%nxk;
+        else
+          kref = k;
+        
+        Uc(RHO,k,j,i) = Uc(RHO,kref,jref,iref);
+        Uc(VX3,k,j,i) = Uc(VX3,kref,jref,iref);
+        if(kref == k){
+          Uc(VX1,k,j,i) = Uc(VX1,kref,jref,iref);
+          Uc(VX2,k,j,i) = Uc(VX2,kref,jref,iref);
+        }
+        else{
+          Uc(VX1,k,j,i) = -Uc(VX1,kref,jref,iref);
+          Uc(VX2,k,j,i) = -Uc(VX2,kref,jref,iref)+2.*shearLocal*x(i);
+        }
+
+
+        });
+}
 
 
 
 // Analyse data to produce an output
 void Analysis(DataBlock & data) {
+
+
 // Mirror data on Host
   DataBlockHost d(data);
   // Sync it
   d.SyncFromDevice();
-  real rho = d.Vc(RHO,0,0,0);
+  real rho = d.dustVc[0](RHO,0,0,0);
   real KE = 0.0;
   for(int k = 0; k < d.np_tot[KDIR] ; k++) {
     for(int j = 0; j < d.np_tot[JDIR] ; j++) {
       for(int i = 0; i < d.np_tot[IDIR] ; i++) {
         KE = KE + d.Vc(RHO,k,j,i)*d.Vc(VX3,k,j,i)*d.Vc(VX3,k,j,i);
-        if(rho < d.Vc(RHO,k,j,i)) {
-          rho=d.Vc(RHO,k,j,i);
+        if(rho < d.dustVc[0](RHO,k,j,i)) {
+          rho=d.dustVc[0](RHO,k,j,i);
         }
       }
     }
@@ -232,6 +346,7 @@ void Analysis(DataBlock & data) {
   #endif
   f.close();
   }
+
 }
 
 // Initialisation routine. Can be used to allocate
@@ -244,7 +359,9 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   cs=input.Get<real>("Hydro","csiso",1);
 
 
+  tauGlob = input.Get<real>("Dust","drag",1);
   epsilon = input.Get<real>("Setup","epsilon",0);
+  chi = input.Get<real>("Setup","chi",0);
   //data.hydro->EnrollUserSourceTerm(&PressureGradient);
   //data.hydro->EnrollUserSourceTerm(&InducedWarpFlow);
 
@@ -268,6 +385,8 @@ void Setup::InitFlow(DataBlock &data) {
     // Create a host copy
     DataBlockHost d(data);
 
+    real taus = tauGlob*omega;
+    real D = 1+chi;
     real Lz = 1.0;
     real Kb = 2.*pi/Lz;
     real Kx = 15.6;
@@ -299,7 +418,22 @@ void Setup::InitFlow(DataBlock &data) {
                 d.Vc(VX3,k,j,i) += -norm_n1*Kx*Kb*1*w_n1*sin(Kx*x+Kb*1*z);
                 d.Vc(VX3,k,j,i) += -norm_n2*Kx*Kb*2*w_n2*sin(Kx*x+Kb*2*z);
 
-                
+                d.dustVc[0](RHO,k,j,i) = chi;
+                //d.dustVc[0](RHO,k,j,i) *= exp(-0.00333232*cos(Kx*x+Kb*1*z)-0.00002455*sin(Kx*x+Kb*1*z));
+                //d.dustVc[0](RHO,k,j,i) *= exp(0.00395556*cos(Kx*x+Kb*2*z)-0.00050466*sin(Kx*x+Kb*2*z));
+
+                d.dustVc[0](VX1,k,j,i) = psi*cs*sin(Kb*z);
+                //d.dustVc[0](VX1,k,j,i) += 0.00010000*cos(Kx*x+Kb*1*z);
+                //d.dustVc[0](VX1,k,j,i) += 0.00010000*cos(Kx*x+Kb*2*z);
+
+                d.dustVc[0](VX2,k,j,i) = shear*x;
+                //d.dustVc[0](VX2,k,j,i) += 0.00002996*cos(Kx*x+Kb*1*z)-0.00004255*sin(Kx*x+Kb*1*z);
+                //d.dustVc[0](VX2,k,j,i) += 0.00001300*cos(Kx*x+Kb*2*z)+0.00005086*sin(Kx*x+Kb*2*z);
+
+                d.dustVc[0](VX3,k,j,i) = 0.0;
+                //d.dustVc[0](VX3,k,j,i) += -0.00004992*cos(Kx*x+Kb*1*z)+0.00002028*sin(Kx*x+Kb*1*z);
+                //d.dustVc[0](VX3,k,j,i) += 0.00008901*cos(Kx*x+Kb*2*z)+0.00002073*sin(Kx*x+Kb*2*z);
+
             }
         }
     }
@@ -311,5 +445,5 @@ void Setup::InitFlow(DataBlock &data) {
 
 // Analyse data to produce an output
 
-//void MakeAnalysis(DataBlock & data) {
-//}
+void MakeAnalysis(DataBlock & data) {
+}
