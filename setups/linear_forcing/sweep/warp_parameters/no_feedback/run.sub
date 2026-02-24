@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+#SBATCH --job-name="no_decomposition"
+#SBATCH --partition=compute
+#SBATCH --time=92:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem-per-cpu=1G
+#SBATCH --account=research-ae-spe
+
+
+module load 2024r1
+module load cmake
+
+srun ./idefix -restart 
